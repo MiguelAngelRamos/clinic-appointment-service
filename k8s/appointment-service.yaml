@@ -1,0 +1,207 @@
+# ============================================================
+#  k8s/appointment-service.yaml — Namespace: clinic
+#
+#  Secret requerido:
+#    kubectl create secret generic appt-postgres-secret \
+#      --namespace clinic \
+#      --from-literal=POSTGRES_USER=appt_svc_user \
+#      --from-literal=POSTGRES_PASSWORD=<PASSWORD> \
+#      --from-literal=POSTGRES_DB=appointment_db
+# ============================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: appointment-service-config
+  namespace: clinic
+data:
+  NODE_ENV: "production"
+  PORT: "3005"
+  DB_HOST: "appt-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "appointment_db"
+  DB_SSL: "false"
+  # URLs internas K8s — DNS del clúster resuelve los nombres de Service
+  PATIENT_SERVICE_URL: "http://patient-service:3003"
+  DOCTOR_SERVICE_URL: "http://doctor-service:3004"
+  ALLOWED_ORIGINS: "http://192.168.1.28:8000"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: appt-postgres-pvc
+  namespace: clinic
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi          # Las citas crecen con el tiempo — 2GB inicial
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appt-postgres
+  namespace: clinic
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appt-postgres
+  template:
+    metadata:
+      labels:
+        app: appt-postgres
+    spec:
+      containers:
+        - name: appt-postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: appt-postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: appt-postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: appt-postgres-secret
+                  key: POSTGRES_DB
+          volumeMounts:
+            - name: appt-postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, appt_svc_user, -d, appointment_db]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: appt-postgres-data
+          persistentVolumeClaim:
+            claimName: appt-postgres-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appt-postgres
+  namespace: clinic
+spec:
+  selector:
+    app: appt-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  namespace: clinic
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+    spec:
+      containers:
+        - name: appointment-service
+          image: ghcr.io/miguelangelramos/clinic-appointment-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3005
+          envFrom:
+            - configMapRef:
+                name: appointment-service-config
+          env:
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: appt-postgres-secret
+                  key: POSTGRES_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: appt-postgres-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 400m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /appointments/health
+              port: 3005
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /appointments/health
+              port: 3005
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointment-service
+  namespace: clinic
+spec:
+  selector:
+    app: appointment-service
+  ports:
+    - port: 3005
+      targetPort: 3005
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: appointment-service-hpa
+  namespace: clinic
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: appointment-service
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
