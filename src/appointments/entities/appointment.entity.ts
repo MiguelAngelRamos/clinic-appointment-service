@@ -11,63 +11,63 @@ import {
   Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
 export enum AppointmentStatus {
-  PENDING = 'pending',       // creada, esperando confirmación
-  CONFIRMED = 'confirmed',   // confirmada por el médico/admin
-  CANCELLED = 'cancelled',   // cancelada por cualquier parte
-  COMPLETED = 'completed',   // consulta realizada
+  PENDING = "pending", // creada, esperando confirmación
+  CONFIRMED = "confirmed", // confirmada por el médico/admin
+  CANCELLED = "cancelled", // cancelada por cualquier parte
+  COMPLETED = "completed", // consulta realizada
 }
 
-@Entity('appointments')
+@Entity("appointments")
 export class Appointment {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id!: string;
 
   // Referencia al perfil del paciente en patient-service
   @Index()
-  @Column({ name: 'patient_id', type: 'uuid' })
+  @Column({ name: "patient_id", type: "uuid" })
   patientId!: string;
 
   // Referencia al perfil del médico en doctor-service
   @Index()
-  @Column({ name: 'doctor_id', type: 'uuid' })
+  @Column({ name: "doctor_id", type: "uuid" })
   doctorId!: string;
 
   // userId del paciente — para ownership checks sin llamar a patient-service
   @Index()
-  @Column({ name: 'patient_user_id', type: 'uuid' })
+  @Column({ name: "patient_user_id", type: "uuid" })
   patientUserId!: string;
 
   // Fecha y hora de la cita
-  @Column({ name: 'scheduled_at', type: 'timestamptz' })
+  @Column({ name: "scheduled_at", type: "timestamptz" })
   scheduledAt!: Date;
 
   // Duración en minutos — para calcular solapamientos en double-booking
-  @Column({ name: 'duration_minutes', type: 'int', default: 30 })
+  @Column({ name: "duration_minutes", type: "int", default: 30 })
   durationMinutes!: number;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: AppointmentStatus,
     default: AppointmentStatus.PENDING,
   })
   status!: AppointmentStatus;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   reason!: string | null;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   notes!: string | null;
 
   // Motivo de cancelación — requerido cuando status = CANCELLED
-  @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
+  @Column({ name: "cancellation_reason", type: "text", nullable: true })
   cancellationReason!: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
 }

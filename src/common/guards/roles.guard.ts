@@ -5,11 +5,11 @@ import {
   ForbiddenException,
   Injectable,
   SetMetadata,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { Request } from "express";
 
-export const ROLES_KEY = 'roles';
+export const ROLES_KEY = "roles";
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 
 @Injectable()
@@ -24,11 +24,11 @@ export class RolesGuard implements CanActivate {
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
-    const userRole = request.headers['x-user-role'] as string;
+    const userRole = request.headers["x-user-role"] as string;
 
     if (!userRole || !requiredRoles.includes(userRole)) {
       throw new ForbiddenException(
-        `Acceso denegado. Rol requerido: ${requiredRoles.join(' | ')}`,
+        `Acceso denegado. Rol requerido: ${requiredRoles.join(" | ")}`,
       );
     }
     return true;

@@ -6,18 +6,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-  Appointment,
-  AppointmentStatus,
-} from './entities/appointment.entity';
-import { CreateAppointmentDto } from './dto/create-appointment.dto';
-import { UpdateStatusDto } from './dto/update-status.dto';
-import { UpdateAppointmentDto } from './dto/update-appointment.dto';
-import { PatientServiceClient } from '../common/http/patient-service.client';
-import { DoctorServiceClient } from '../common/http/doctor-service.client';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Appointment, AppointmentStatus } from "./entities/appointment.entity";
+import { CreateAppointmentDto } from "./dto/create-appointment.dto";
+import { UpdateStatusDto } from "./dto/update-status.dto";
+import { UpdateAppointmentDto } from "./dto/update-appointment.dto";
+import { PatientServiceClient } from "../common/http/patient-service.client";
+import { DoctorServiceClient } from "../common/http/doctor-service.client";
 
 @Injectable()
 export class AppointmentsService {
@@ -34,7 +31,7 @@ export class AppointmentsService {
   // findAll — solo ADMIN
   async findAll(): Promise<Appointment[]> {
     return this.appointmentRepository.find({
-      order: { scheduledAt: 'DESC' },
+      order: { scheduledAt: "DESC" },
     });
   }
 
@@ -42,7 +39,7 @@ export class AppointmentsService {
   async findMyAppointments(patientUserId: string): Promise<Appointment[]> {
     return this.appointmentRepository.find({
       where: { patientUserId },
-      order: { scheduledAt: 'DESC' },
+      order: { scheduledAt: "DESC" },
     });
   }
 
@@ -53,20 +50,20 @@ export class AppointmentsService {
     requesterRole: string,
   ): Promise<Appointment[]> {
     // Solo ADMIN o el propio médico puede ver la agenda
-    if (requesterRole !== 'admin') {
+    if (requesterRole !== "admin") {
       // Verificar que el doctorId pertenece al médico solicitante
       // Esta verificación se hace comparando userId del médico con requesterId
       // Lo hacemos localmente — no hay llamada a doctor-service aquí
       const ownAppointments = await this.appointmentRepository.find({
         where: { doctorId },
-        order: { scheduledAt: 'DESC' },
+        order: { scheduledAt: "DESC" },
       });
 
       // Si el médico no tiene citas con este doctorId, puede que no sea su perfil
       // La verificación real de ownership se haría con un endpoint del doctor-service
       // pero lo simplificamos usando el rol — un doctor solo ve sus citas por su doctorId
-      if (requesterRole !== 'doctor') {
-        throw new ForbiddenException('No tienes permiso para ver esta agenda');
+      if (requesterRole !== "doctor") {
+        throw new ForbiddenException("No tienes permiso para ver esta agenda");
       }
 
       return ownAppointments;
@@ -74,7 +71,7 @@ export class AppointmentsService {
 
     return this.appointmentRepository.find({
       where: { doctorId },
-      order: { scheduledAt: 'DESC' },
+      order: { scheduledAt: "DESC" },
     });
   }
 
@@ -103,8 +100,8 @@ export class AppointmentsService {
     requesterRole: string,
   ): Promise<Appointment> {
     // Solo pacientes (o ADMIN) pueden crear citas
-    if (requesterRole !== 'patient' && requesterRole !== 'admin') {
-      throw new ForbiddenException('Solo los pacientes pueden crear citas');
+    if (requesterRole !== "patient" && requesterRole !== "admin") {
+      throw new ForbiddenException("Solo los pacientes pueden crear citas");
     }
 
     const scheduledAt = new Date(dto.scheduledAt);
@@ -113,7 +110,7 @@ export class AppointmentsService {
     // Validar que la cita es en el futuro
     if (scheduledAt <= new Date()) {
       throw new BadRequestException(
-        'La cita debe programarse en una fecha y hora futura',
+        "La cita debe programarse en una fecha y hora futura",
       );
     }
 
@@ -122,15 +119,12 @@ export class AppointmentsService {
     this.logger.log(
       `Verificando paciente para userId ${requesterId} en patient-service`,
     );
-    const patient = await this.patientServiceClient.verifyPatientExists(
-      requesterId,
-    );
+    const patient =
+      await this.patientServiceClient.verifyPatientExists(requesterId);
 
     // ── Paso 2: Verificar que el médico existe en doctor-service ──
     // HTTP REST síncrono — necesitamos confirmar que el médico está activo
-    this.logger.log(
-      `Verificando médico ${dto.doctorId} en doctor-service`,
-    );
+    this.logger.log(`Verificando médico ${dto.doctorId} en doctor-service`);
     await this.doctorServiceClient.verifyDoctorExists(dto.doctorId);
 
     // ── Paso 3: Double-booking prevention ──────────────────────────
@@ -149,8 +143,8 @@ export class AppointmentsService {
     // ──────────────────────────────────────────────────────────────
 
     const appointment = this.appointmentRepository.create({
-      patientId: patient.id,       // ID del perfil de paciente
-      patientUserId: requesterId,  // userId para ownership checks locales
+      patientId: patient.id, // ID del perfil de paciente
+      patientUserId: requesterId, // userId para ownership checks locales
       doctorId: dto.doctorId,
       scheduledAt,
       durationMinutes,
@@ -188,12 +182,9 @@ export class AppointmentsService {
     );
 
     // Cancelación requiere motivo
-    if (
-      dto.status === AppointmentStatus.CANCELLED &&
-      !dto.cancellationReason
-    ) {
+    if (dto.status === AppointmentStatus.CANCELLED && !dto.cancellationReason) {
       throw new BadRequestException(
-        'Se requiere un motivo para cancelar la cita',
+        "Se requiere un motivo para cancelar la cita",
       );
     }
 
@@ -219,7 +210,7 @@ export class AppointmentsService {
     // Solo se puede editar si está en estado PENDING
     if (appointment.status !== AppointmentStatus.PENDING) {
       throw new BadRequestException(
-        'Solo se pueden editar citas en estado pendiente',
+        "Solo se pueden editar citas en estado pendiente",
       );
     }
 
@@ -237,9 +228,9 @@ export class AppointmentsService {
     excludeId: string | null,
   ): Promise<void> {
     const qb = this.appointmentRepository
-      .createQueryBuilder('a')
-      .where('a.doctorId = :doctorId', { doctorId })
-      .andWhere('a.status NOT IN (:...cancelledStatuses)', {
+      .createQueryBuilder("a")
+      .where("a.doctorId = :doctorId", { doctorId })
+      .andWhere("a.status NOT IN (:...cancelledStatuses)", {
         cancelledStatuses: [
           AppointmentStatus.CANCELLED,
           AppointmentStatus.COMPLETED,
@@ -248,14 +239,14 @@ export class AppointmentsService {
       // Solapamiento de intervalos:
       // La nueva cita empieza antes de que termine la existente
       // Y termina después de que empiece la existente
-      .andWhere('a.scheduledAt < :end', { end })
+      .andWhere("a.scheduledAt < :end", { end })
       .andWhere(
         `(a.scheduledAt + (a.durationMinutes * interval '1 minute')) > :start`,
         { start },
       );
 
     if (excludeId) {
-      qb.andWhere('a.id != :excludeId', { excludeId });
+      qb.andWhere("a.id != :excludeId", { excludeId });
     }
 
     const conflicting = await qb.getOne();
@@ -288,17 +279,21 @@ export class AppointmentsService {
     // Solo ADMIN o doctor pueden confirmar
     if (
       next === AppointmentStatus.CONFIRMED &&
-      !['admin', 'doctor'].includes(requesterRole)
+      !["admin", "doctor"].includes(requesterRole)
     ) {
-      throw new ForbiddenException('Solo un médico o admin puede confirmar la cita');
+      throw new ForbiddenException(
+        "Solo un médico o admin puede confirmar la cita",
+      );
     }
 
     // Solo ADMIN o doctor pueden marcar como completada
     if (
       next === AppointmentStatus.COMPLETED &&
-      !['admin', 'doctor'].includes(requesterRole)
+      !["admin", "doctor"].includes(requesterRole)
     ) {
-      throw new ForbiddenException('Solo un médico o admin puede completar la cita');
+      throw new ForbiddenException(
+        "Solo un médico o admin puede completar la cita",
+      );
     }
   }
 
@@ -308,11 +303,11 @@ export class AppointmentsService {
     requesterId: string,
     requesterRole: string,
   ): void {
-    if (requesterRole === 'admin') return;
+    if (requesterRole === "admin") return;
     if (appointment.patientUserId === requesterId) return;
     // El médico también puede ver sus propias citas
     // Aquí usamos una heurística — en producción se consultaría doctor-service
-    if (requesterRole === 'doctor') return;
-    throw new ForbiddenException('No tienes permiso para acceder a esta cita');
+    if (requesterRole === "doctor") return;
+    throw new ForbiddenException("No tienes permiso para acceder a esta cita");
   }
 }

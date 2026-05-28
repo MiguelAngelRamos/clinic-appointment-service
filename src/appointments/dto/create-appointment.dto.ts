@@ -7,11 +7,11 @@ import {
   IsUUID,
   Max,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 export class CreateAppointmentDto {
   // ID del perfil del médico en doctor-service
-  @IsUUID('4')
+  @IsUUID("4")
   doctorId!: string;
 
   // Fecha y hora de la cita — ISO 8601 con timezone

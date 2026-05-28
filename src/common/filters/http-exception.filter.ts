@@ -6,8 +6,8 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
+} from "@nestjs/common";
+import { Request, Response } from "express";
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -26,9 +26,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const message =
       exception instanceof HttpException
         ? exception.getResponse()
-        : 'Error interno del servidor';
+        : "Error interno del servidor";
 
-    const correlationId = request.headers['x-request-id'] ?? 'no-id';
+    const correlationId = request.headers["x-request-id"] ?? "no-id";
     this.logger.error(
       `[${correlationId}] ${request.method} ${request.url} → ${status}`,
     );
@@ -42,7 +42,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message:
-        typeof message === 'object' && 'message' in (message as object)
+        typeof message === "object" && "message" in (message as object)
           ? (message as { message: string }).message
           : message,
     });

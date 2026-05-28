@@ -9,9 +9,9 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import axios, { AxiosError } from 'axios';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { HttpClient, HttpResponse } from "./http-client";
 
 export interface DoctorResponse {
   id: string;
@@ -27,43 +27,53 @@ export class DoctorServiceClient {
   private readonly logger = new Logger(DoctorServiceClient.name);
   private readonly baseUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly httpClient: HttpClient,
+  ) {
     this.baseUrl = this.configService.getOrThrow<string>(
-      'app.doctorServiceUrl',
+      "app.doctorServiceUrl",
     );
   }
 
   // verifyDoctorExists — llama a GET /doctors/:doctorId
   // Verifica que el médico existe y está activo
   async verifyDoctorExists(doctorId: string): Promise<DoctorResponse> {
+    let response: HttpResponse<DoctorResponse>;
     try {
-      const response = await axios.get<DoctorResponse>(
+      response = await this.httpClient.get<DoctorResponse>(
         `${this.baseUrl}/doctors/${doctorId}`,
         {
-          timeout: 5000,
+          timeoutMs: 5000,
           headers: {
-            'x-user-id': 'appointment-service',
-            'x-user-role': 'admin',
+            "x-user-id": "appointment-service",
+            "x-user-role": "admin",
           },
         },
       );
-      return response.data;
     } catch (error) {
-      const axiosError = error as AxiosError;
-
-      if (axiosError.response?.status === 404) {
-        throw new NotFoundException(
-          `El médico ${doctorId} no existe o no está activo`,
-        );
-      }
-
       this.logger.error(
         `Error al contactar doctor-service [GET /doctors/${doctorId}]: ` +
-          `${axiosError.message}`,
+          `${(error as Error).message}`,
       );
       throw new ServiceUnavailableException(
-        'El servicio de médicos no está disponible. Intenta de nuevo.',
+        "El servicio de médicos no está disponible. Intenta de nuevo.",
       );
     }
+    if (response.status === 404) {
+      throw new NotFoundException(
+        `El médico ${doctorId} no existe o no está activo`,
+      );
+    }
+    if (!response.ok) {
+      this.logger.error(
+        `Error al contactar doctor-service [GET /doctors/${doctorId}]: ` +
+          `HTTP ${response.status}`,
+      );
+      throw new ServiceUnavailableException(
+        "El servicio de médicos no está disponible. Intenta de nuevo.",
+      );
+    }
+    return response.data;
   }
 }

@@ -1,8 +1,8 @@
 // src/database/migrations/1748000004000-InitialSchema.ts
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class InitialSchema1748000004000 implements MigrationInterface {
-  name = 'InitialSchema1748000004000';
+  name = "InitialSchema1748000004000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
@@ -30,11 +30,21 @@ export class InitialSchema1748000004000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_appt_patient_id"      ON "appointments" ("patient_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_appt_doctor_id"       ON "appointments" ("doctor_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_appt_patient_user_id" ON "appointments" ("patient_user_id")`);
-    await queryRunner.query(`CREATE INDEX "IDX_appt_scheduled_at"    ON "appointments" ("scheduled_at")`);
-    await queryRunner.query(`CREATE INDEX "IDX_appt_status"          ON "appointments" ("status")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_appt_patient_id"      ON "appointments" ("patient_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_appt_doctor_id"       ON "appointments" ("doctor_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_appt_patient_user_id" ON "appointments" ("patient_user_id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_appt_scheduled_at"    ON "appointments" ("scheduled_at")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_appt_status"          ON "appointments" ("status")`,
+    );
 
     // Índice compuesto para la query de double-booking
     // Optimiza: WHERE doctor_id = X AND scheduled_at < Y AND status NOT IN (...)
